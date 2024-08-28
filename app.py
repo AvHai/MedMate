@@ -56,7 +56,7 @@ def set_custom_prompt():
       Question: {question}
 
       Provide the most relevant information based on the context. If the answer is not available, respond with "I don't know."
-      Helpful answer:
+      Helpful answer:
     """
     prompt = PromptTemplate(template=custom_prompt_template,
                             input_variables=['context', 'question'])
@@ -97,34 +97,27 @@ def main():
     if "end_chat" not in st.session_state:
         st.session_state.end_chat = False
 
-    # User input and button to get the answer
-    user_query = st.text_input("What are your symptoms?", key="user_query")
+    # Display chat history
+    st.write("### Chat History")
+    for message in st.session_state.chat_history:
+        st.write(message)
 
-    if st.button("Get Answer"):
-        if user_query:
+    st.write("---")  # A horizontal line to separate the chat history from the input section
+
+    # User input section
+    with st.form(key='user_input_form', clear_on_submit=True):
+        user_query = st.text_input("What are your symptoms?", key="user_query")
+        submit_button = st.form_submit_button(label='Get Answer')
+
+        if submit_button and user_query:
             with st.spinner("Processing..."):
                 qa_chain = qa_bot()
                 res = qa_chain({"query": user_query})
                 answer = res["result"]
-                sources = res["source_documents"]
 
                 # Update chat history in session state
                 st.session_state.chat_history.append(f"You: {user_query}")
                 st.session_state.chat_history.append(f"Bot: {answer}")
-
-                # Display chat history
-                for message in st.session_state.chat_history:
-                    st.write(message)
-
-                # Optionally display sources:
-                # if sources:
-                #     st.write("*Sources:*")
-                #     for doc in sources:
-                #         st.write(doc)
-                # else:
-                #     st.write("*Sources:* No sources found")
-        else:
-            st.warning("Please enter a query.")
 
     # End Chat button
     if st.button("End Chat"):
