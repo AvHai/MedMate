@@ -5,6 +5,8 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
+import streamlit_scrollable_textbox as stx
+
 
 API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-v0.1"
 HF_ACCESS_TOKEN = "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"
@@ -88,6 +90,8 @@ def qa_bot():
     return qa_chain
 
 # Streamlit code
+import streamlit as st
+
 def main():
     st.title("DiagnosAI Bot")
 
@@ -97,10 +101,11 @@ def main():
     if "end_chat" not in st.session_state:
         st.session_state.end_chat = False
 
-    # Display chat history
-    st.write("### Chat History")
+    # Display previous messages
     for message in st.session_state.chat_history:
-        st.write(message)
+        role, text = message.split(": ", 1)
+        with st.chat_message(role.lower()):
+            st.markdown(text)
 
     st.write("---")  # A horizontal line to separate the chat history from the input section
 
@@ -110,13 +115,23 @@ def main():
         submit_button = st.form_submit_button(label='Get Answer')
 
         if submit_button and user_query:
+            # Display user query
+            with st.chat_message("user"):
+                st.markdown(user_query)
+            st.session_state.chat_history.append(f"You: {user_query}")
+
             with st.spinner("Processing..."):
                 qa_chain = qa_bot()
                 res = qa_chain({"query": user_query})
                 answer = res["result"]
 
+                # Display the assistant's response
+                with st.chat_message("bot"):
+                    message_placeholder = st.empty()
+                    message_placeholder.markdown(answer + "▌")
+                    message_placeholder.markdown(answer)
+
                 # Update chat history in session state
-                st.session_state.chat_history.append(f"You: {user_query}")
                 st.session_state.chat_history.append(f"Bot: {answer}")
 
     # End Chat button
