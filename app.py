@@ -39,25 +39,24 @@ def custom_llm(input_text):
         "parameters": {"max_new_tokens": 128, "temperature": 0.1}
     }
     response = query(payload)
-    
+
     # Check if response is a list and extract the generated text
     if isinstance(response, list) and len(response) > 0:
         generated_text = response[0].get("generated_text", "")
     else:
         generated_text = "No response from model."
-    
+
     return {"generated_text": generated_text}
 
 def set_custom_prompt():
-    custom_prompt_template = """Use the following pieces of information to answer the user's question on symptoms they have.
-    If you don't know the answer don't try to make up an answer.
-    Briefly describe the disease and treatments of the disease user has and appropriate type of doctor.
-    
-    Context: {context}
-    Question: {question}
+    custom_prompt_template = """Use the following context to answer the user's question about medical conditions. If the answer cannot be found in the context, state that you don't know.
 
-    Only return the helpful answer below.
-    Helpful answer:
+      Context: Information about various medical conditions, including their short descriptions, symptoms, precautions, treatments, and types of doctors to consult.
+
+      Question: {question}
+
+      Provide the most relevant information based on the context. If the answer is not available, respond with "I don't know."
+      Helpful answer:
     """
     prompt = PromptTemplate(template=custom_prompt_template,
                             input_variables=['context', 'question'])
@@ -70,7 +69,7 @@ def retrieval_qa_chain(llm_func, prompt, db):
         documents = retriever.get_relevant_documents(query['query'])
         context = " ".join([doc.page_content for doc in documents])
         formatted_prompt = prompt.format(context=context, question=query['query'])
-        
+
         llm_response = llm_func(formatted_prompt)
         return {"result": llm_response.get("generated_text", "No response"), "source_documents": documents}
 
@@ -82,7 +81,7 @@ def qa_bot():
         model_name="sentence-transformers/all-MiniLM-L6-v2",
         model_kwargs={'device': 'cpu'}
     )
-    db = FAISS.load_local(DB_FAISS_PATH, embeddings,allow_dangerous_deserialization=True)
+    db = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
     qa_prompt = set_custom_prompt()
     qa_chain = retrieval_qa_chain(custom_llm, qa_prompt, db)
 
@@ -92,7 +91,14 @@ def qa_bot():
 def main():
     st.title("DiagnosAI Bot")
 
-    user_query = st.text_input("Hi, Welcome to DiagnosAI Bot. What are your symptoms?")
+    # Initialize session state variables
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "end_chat" not in st.session_state:
+        st.session_state.end_chat = False
+
+    # User input and button to get the answer
+    user_query = st.text_input("What are your symptoms?", key="user_query")
 
     if st.button("Get Answer"):
         if user_query:
@@ -102,13 +108,28 @@ def main():
                 answer = res["result"]
                 sources = res["source_documents"]
 
-                st.write("*Answer:*", answer)
-                if sources:
-                    st.write("*Sources:*", sources)
-                else:
-                    st.write("*Sources:* No sources found")
+                # Update chat history in session state
+                st.session_state.chat_history.append(f"You: {user_query}")
+                st.session_state.chat_history.append(f"Bot: {answer}")
+
+                # Display chat history
+                for message in st.session_state.chat_history:
+                    st.write(message)
+
+                # Optionally display sources:
+                # if sources:
+                #     st.write("*Sources:*")
+                #     for doc in sources:
+                #         st.write(doc)
+                # else:
+                #     st.write("*Sources:* No sources found")
         else:
             st.warning("Please enter a query.")
+
+    # End Chat button
+    if st.button("End Chat"):
+        st.session_state.end_chat = True
+        st.write("Chat ended.")
 
 if __name__ == "__main__":
     main()
